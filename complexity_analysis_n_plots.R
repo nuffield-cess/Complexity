@@ -10,11 +10,17 @@ library(gridExtra)
 library(coefplot)
 #library(readstata13)
 library(plyr)
+library(FindIt)
 
 
-setwd("C:/Users/Denise Laroze/Dropbox/CESS-Santiago/Denise/Complexity")
+setwd("C:/Users/André Laroze/Dropbox/CESS-Santiago/Denise/Complexity")
 
 rm(list=ls())
+v<-"_06June2017"
+
+
+
+
 
 #load("conjoint_data.RData")
 
@@ -22,17 +28,16 @@ rm(list=ls())
 
 load("all_data.RData")
 
+
+###################
+### Data Management
+###################
+
 names(cjoint.data)
 
 cjoint.data.r<-cjoint.data
 cjoint.data.r<-cbind(cjoint.data.r, df[, c("partisan", "crimedum1", "crimedum3", "jobsdum1", "jobsdum3", "garbagedum1", "garbagedum3")])
 
-
-v<-"_02"
-
-###################
-### Data Management
-###################
 
 
 ### Renaming variables for simplicity in data analysis and coding
@@ -100,6 +105,53 @@ cjoint.data.r <- within(cjoint.data.r, gender <- relevel(gender, ref = "Male"))
 #####  Candidate Selection
 ##########################
 
+####################
+###### Causal Anova
+#####################
+
+### ordering factors
+cjoint.data.r$jobs <- factor(cjoint.data.r$jobs,ordered=TRUE,
+                             levels=c("Significant_increase_in_new_private_sector_jobs","No_change_in_private_sector_jobs",
+                                      "Significant_decline_in_private_sector_jobs"))
+
+cjoint.data.r$crime <- factor(cjoint.data.r$crime,ordered=TRUE,
+                             levels=c("Considerable_decrease_in_murder_rate","Did_not_change",
+                                      "Considerable_increase_in_murder_rate"))
+
+cjoint.data.r$garbage <- factor(cjoint.data.r$garbage,ordered=TRUE,
+                             levels=c("Improved_considerably","Did_not_change",
+                                      "Declined_considerably"))
+
+
+cv.fit <- cv.CausalANOVA(chosen_cand~  crime + jobs + garbage,
+                         data=cjoint.data.r,
+                         pair.id=cjoint.data.r$contest_number,
+                         diff=T, nway=3, seed=236665)  ### Different seeds suggest 0.7 or 1 as the cost
+
+cv.fit
+plot(cv.fit)
+
+fit <- CausalANOVA(chosen_cand~  crime + jobs + garbage,
+                   data=cjoint.data.r,
+                   pair.id=cjoint.data.r$contest_number,diff=TRUE,
+                   nway=3,
+                   cost=0.85, ### Different seeds suggest 0.7 or 1 as the cost, so I've gone 0.85 as the midpoint
+                   select.prob=F,boot=500, seed=2696333)
+
+summary(fit)
+
+
+plot(fit,fac.name=c("crime","jobs"))
+
+
+### Alternative LM model
+
+lm1<-lm(chosen_cand~ garbage*jobs*crime , data=cjoint.data.r)
+summary(lm1)
+
+
+
+########################
 #### Subseting approach
 lm1<-lm(chosen_cand~ education + race + gender + party_aff + garbage  , data=subset(cjoint.data.r, cj_neg==1 ))
 summary(lm1)
